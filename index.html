@@ -564,7 +564,7 @@ async function downloadPdf(){
   document.getElementById('statusText').textContent = "Menyiapkan PDF...";
   const el = document.getElementById('formArea');
   const canvas = await html2canvas(el, {
-    scale: 2,
+    scale: 1.5,
     useCORS: true,
     backgroundColor: '#ffffff',
     windowWidth: 900   // paksa layout "desktop" (2 kolom) walau dibuka dari HP
@@ -587,8 +587,9 @@ async function downloadPdf(){
     offsetX = (pageWidth - imgWidth) / 2;
   }
 
-  const imgData = canvas.toDataURL('image/png');
-  pdf.addImage(imgData, 'PNG', offsetX, 0, imgWidth, imgHeight);
+  // JPEG kompresi jauh lebih kecil ukurannya dibanding PNG untuk dokumen seperti ini
+  const imgData = canvas.toDataURL('image/jpeg', 0.85);
+  pdf.addImage(imgData, 'JPEG', offsetX, 0, imgWidth, imgHeight, undefined, 'FAST');
   pdf.save((document.getElementById('noForm').value || 'form-pemakaian-mobil') + '.pdf');
   document.getElementById('statusText').textContent = "PDF terunduh ✅ (1 halaman)";
 }
