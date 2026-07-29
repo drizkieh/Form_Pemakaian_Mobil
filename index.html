@@ -192,12 +192,9 @@
   <!-- HEADER -->
   <div class="header">
     <div class="logo-box">
-      <div class="logo-diamond">
-        <svg viewBox="0 0 100 100">
-          <polygon points="50,4 96,50 50,96 4,50" fill="#f07d1a"/>
-          <polygon points="50,20 80,50 50,80 20,50" fill="#8a1116"/>
-          <polygon points="50,36 64,50 50,64 36,50" fill="#f5a623"/>
-        </svg>
+      <div class="logo-diamond" id="logoDiamond">
+        <img src="logo.png" alt="Logo" style="width:100%; height:100%; object-fit:contain;"
+             onerror="this.remove(); document.getElementById('logoDiamond').innerHTML = document.getElementById('fallbackLogo').innerHTML;">
       </div>
       <div class="logo-text">
         <b>INTEGRA</b>
@@ -208,6 +205,13 @@
       <h1>FORM PEMAKAIAN MOBIL</h1>
       <div class="car-ico">🚗</div>
     </div>
+  </div>
+  <div id="fallbackLogo" style="display:none;">
+    <svg viewBox="0 0 100 100">
+      <polygon points="50,4 96,50 50,96 4,50" fill="#f07d1a"/>
+      <polygon points="50,20 80,50 50,80 20,50" fill="#8a1116"/>
+      <polygon points="50,36 64,50 50,64 36,50" fill="#f5a623"/>
+    </svg>
   </div>
 
   <div class="meta-box">
@@ -559,7 +563,12 @@ function printForm(){
 async function downloadPdf(){
   document.getElementById('statusText').textContent = "Menyiapkan PDF...";
   const el = document.getElementById('formArea');
-  const canvas = await html2canvas(el, { scale: 2, useCORS:true, backgroundColor:'#ffffff' });
+  const canvas = await html2canvas(el, {
+    scale: 2,
+    useCORS: true,
+    backgroundColor: '#ffffff',
+    windowWidth: 900   // paksa layout "desktop" (2 kolom) walau dibuka dari HP
+  });
 
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF('p', 'mm', 'a4');
