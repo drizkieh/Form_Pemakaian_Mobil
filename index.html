@@ -168,6 +168,10 @@
     #formArea{ box-shadow:none; width:100%; }
     input, textarea{ border-bottom:1px solid #000 !important; }
   }
+
+  /* jaga supaya blok tidak terpotong di tengah saat print / export PDF */
+  .pdf-block{ break-inside: avoid; page-break-inside: avoid; }
+  .header, .veh-card, .handover, .section-title{ break-inside: avoid; page-break-inside: avoid; }
 </style>
 </head>
 <body>
@@ -184,6 +188,7 @@
 <div class="page-wrap">
 <div id="formArea">
 
+<div class="pdf-block">
   <!-- HEADER -->
   <div class="header">
     <div class="logo-box">
@@ -211,9 +216,10 @@
   </div>
 
   <div class="instruction">Mohon lengkapi data berikut dengan benar.</div>
+</div>
 
   <!-- 1. DATA PENGGUNA -->
-  <div class="section">
+  <div class="section pdf-block">
     <div class="section-title red">1. DATA PENGGUNA</div>
     <div class="two-col">
       <div>
@@ -249,7 +255,7 @@
   </div>
 
   <!-- 3. DETAIL INFORMASI KENDARAAN -->
-  <div class="section">
+  <div class="section pdf-block">
     <div class="section-title orange">3. DETAIL INFORMASI KENDARAAN</div>
     <div class="veh-card">
       <div class="edit-btn-row">
@@ -308,6 +314,7 @@
   </div>
 
   <!-- 4. SERAH TERIMA -->
+<div class="pdf-block">
   <div class="section" style="padding-bottom:0;">
     <div class="section-title orange">4. SERAH TERIMA KENDARAAN</div>
   </div>
@@ -343,6 +350,7 @@
   </div>
 
   <div class="footer-note">Catatan: Form ini digunakan untuk keperluan pemakaian mobil dinas dan bukan merupakan form rental mobil.</div>
+</div>
 </div>
 </div>
 
@@ -544,28 +552,50 @@ function printForm(){
   window.print();
 }
 
+// render setiap blok (.pdf-block) sebagai potongan sendiri, supaya halaman
+// tidak pernah terpotong di tengah section (fuel gauge, veh-card, dll)
 async function downloadPdf(){
   document.getElementById('statusText').textContent = "Menyiapkan PDF...";
-  const el = document.getElementById('formArea');
-  const canvas = await html2canvas(el, { scale: 2, useCORS:true });
-  const imgData = canvas.toDataURL('image/png');
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF('p', 'mm', 'a4');
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
-  const imgWidth = pageWidth;
-  const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-  let heightLeft = imgHeight;
+  const blocks = document.querySelectorAll('#formArea .pdf-block');
   let position = 0;
-  pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-  heightLeft -= pageHeight;
-  while(heightLeft > 0){
-    position = heightLeft - imgHeight;
-    pdf.addPage();
+  let firstPage = true;
+
+  for(const block of blocks){
+    const canvas = await html2canvas(block, { scale: 2, useCORS:true, backgroundColor:'#ffffff' });
+    const imgData = canvas.toDataURL('image/png');
+    const imgWidth = pageWidth;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+    if(imgHeight > pageHeight){
+      // blok ini sendiri lebih panjang dari 1 halaman -> potong per-halaman apa boleh buat
+      let heightLeft = imgHeight;
+      let sliceY = 0;
+      if(!firstPage) pdf.addPage();
+      while(heightLeft > 0){
+        pdf.addImage(imgData, 'PNG', 0, -sliceY, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+        sliceY += pageHeight;
+        if(heightLeft > 0) pdf.addPage();
+      }
+      position = pageHeight - (imgHeight - (Math.ceil(imgHeight/pageHeight)-1)*pageHeight);
+      firstPage = false;
+      continue;
+    }
+
+    if(!firstPage && position + imgHeight > pageHeight){
+      pdf.addPage();
+      position = 0;
+    }
     pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
+    position += imgHeight;
+    firstPage = false;
   }
+
   pdf.save((document.getElementById('noForm').value || 'form-pemakaian-mobil') + '.pdf');
   document.getElementById('statusText').textContent = "PDF terunduh ✅";
 }
