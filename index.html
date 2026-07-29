@@ -24,13 +24,47 @@
     background:var(--bg);
     color:var(--ink);
   }
+  /* ---- SIDEBAR ---- */
+  .sidebar-overlay{
+    display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;
+  }
+  .sidebar-overlay.open{display:block;}
+  .sidebar{
+    position:fixed;top:0;left:-280px;width:280px;height:100%;
+    background:#20232a;color:#fff;z-index:201;
+    transition:left .25s ease;display:flex;flex-direction:column;
+  }
+  .sidebar.open{left:0;}
+  .sidebar-head{
+    padding:20px 18px 14px;border-bottom:1px solid #3a3f47;
+    display:flex;align-items:center;gap:12px;
+  }
+  .sidebar-head .logo-mini{width:36px;height:36px;flex:none;}
+  .sidebar-head .logo-mini svg{width:100%;height:100%;}
+  .sidebar-head .brand b{display:block;font-size:14px;letter-spacing:.5px;}
+  .sidebar-head .brand span{display:block;font-size:10px;color:#9aa0aa;letter-spacing:2px;}
+  .sidebar-close{margin-left:auto;background:none;border:none;color:#9aa0aa;font-size:20px;cursor:pointer;line-height:1;}
+  .sidebar-close:hover{color:#fff;}
+  .sidebar-nav{flex:1;padding:12px 0;}
+  .sidebar-nav a{
+    display:flex;align-items:center;gap:12px;
+    padding:13px 20px;color:#c9ccd1;text-decoration:none;font-size:14px;
+    transition:background .15s,color .15s;
+  }
+  .sidebar-nav a:hover{background:#2c3038;color:#fff;}
+  .sidebar-nav a.active{background:var(--red);color:#fff;font-weight:600;}
+  .sidebar-nav a .icon{width:20px;text-align:center;flex:none;}
+  .sidebar-nav .divider{height:1px;background:#3a3f47;margin:8px 0;}
+  .sidebar-footer{padding:14px 20px;font-size:11px;color:#6b7280;border-top:1px solid #3a3f47;}
+
   .toolbar{
     position:sticky; top:0; z-index:50;
     background:#20232a; color:#fff;
     padding:10px 16px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;
   }
   .toolbar .spacer{flex:1;}
-  .toolbar button{
+  .toolbar .menu-btn{background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:4px 6px;line-height:1;}
+  .toolbar button:not(.menu-btn){
     background:var(--orange); color:#fff; border:none; border-radius:6px;
     padding:9px 16px; font-size:14px; font-weight:600; cursor:pointer;
   }
@@ -176,7 +210,29 @@
 </head>
 <body>
 
+<!-- SIDEBAR OVERLAY -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<!-- SIDEBAR -->
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-head">
+    <div class="logo-mini">
+      <svg viewBox="0 0 100 100"><polygon points="50,4 96,50 50,96 4,50" fill="#f07d1a"/><polygon points="50,20 80,50 50,80 20,50" fill="#8a1116"/><polygon points="50,36 64,50 50,64 36,50" fill="#f5a623"/></svg>
+    </div>
+    <div class="brand"><b>INTEGRA</b><span>SOLUSI MANDIRI</span></div>
+    <button class="sidebar-close" onclick="closeSidebar()">✕</button>
+  </div>
+  <nav class="sidebar-nav">
+    <a href="index.html" class="active"><span class="icon">🚗</span>Form Peminjaman</a>
+    <a href="form-pengembalian-mobil.html"><span class="icon">🔄</span>Form Pengembalian</a>
+    <div class="divider"></div>
+    <a href="#" onclick="window.open('https://docs.google.com/spreadsheets','_blank');closeSidebar();return false;"><span class="icon">📊</span>Google Sheet</a>
+  </nav>
+  <div class="sidebar-footer">PT Integra Solusi Mandiri &copy; 2025</div>
+</div>
+
 <div class="toolbar">
+  <button class="menu-btn" onclick="openSidebar()" title="Menu">☰</button>
   <button onclick="printForm()">🖨️ Print</button>
   <button onclick="downloadPdf()">⬇️ Download PDF</button>
   <div class="spacer"></div>
@@ -369,6 +425,38 @@ const CONFIG = {
   SUPERUSER_PASSWORD: "integra2026" // ganti password ini, dan cocokkan juga di Code.gs
 };
 
+/* ---- SIDEBAR ---- */
+function openSidebar(){
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebarOverlay').classList.add('open');
+}
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('open');
+}
+
+/* ---- CEK KETERSEDIAAN KENDARAAN (sebelum submit) ---- */
+async function cekKendaraanTersedia(){
+  if(!CONFIG.SCRIPT_URL.startsWith("http")) return true; // skip jika belum konfigurasi
+  try{
+    const res = await fetch(CONFIG.SCRIPT_URL + "?action=checkVehicleAvailability");
+    const json = await res.json();
+    if(json && json.isAvailable === false){
+      const conf = confirm(
+        `⚠️ PERHATIAN: Kendaraan masih dalam status DIPINJAM\n\n` +
+        `Peminjam: ${json.borrowerName || '-'}\n` +
+        `No. Form: ${json.noForm || '-'}\n` +
+        `Rencana kembali: ${json.returnDate || '-'}\n\n` +
+        `Kendaraan belum dikembalikan. Lanjutkan submit peminjaman baru?`
+      );
+      return conf;
+    }
+    return true;
+  }catch(e){
+    return true; // jika gagal cek, tetap lanjut
+  }
+}
+
 let superUserMode = false;
 
 // isi tanggal & no form default
@@ -536,6 +624,13 @@ async function submitForm(){
   }
   if(!CONFIG.SCRIPT_URL.startsWith("http")){
     alert("SCRIPT_URL Google Apps Script belum dikonfigurasi. Lihat komentar CONFIG di kode, dan file Code.gs yang disertakan.");
+    return;
+  }
+  // Cek apakah kendaraan masih dipinjam
+  document.getElementById('statusText').textContent = "Mengecek ketersediaan kendaraan...";
+  const bolehLanjut = await cekKendaraanTersedia();
+  if(!bolehLanjut){
+    document.getElementById('statusText').textContent = "Submit dibatalkan — kendaraan masih dipinjam.";
     return;
   }
   document.getElementById('statusText').textContent = "Menyimpan...";
