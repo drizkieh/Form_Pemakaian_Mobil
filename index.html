@@ -163,6 +163,45 @@
   .footer-note{font-size:11px;color:#555;padding:6px 24px 8px;border-top:1px solid var(--line);margin-top:4px;}
   .required{color:var(--red);}
 
+  /* PIN / PASSWORD MODAL */
+  .pin-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:320;align-items:center;justify-content:center;padding:20px;}
+  .pin-overlay.open{display:flex;}
+  .pin-modal{background:#fff;border-radius:8px;width:380px;max-width:100%;box-shadow:0 10px 40px rgba(0,0,0,.3);}
+  .pin-modal-head{padding:16px 20px 8px;display:flex;align-items:center;gap:10px;}
+  .pin-modal-head h3{margin:0;font-size:15px;flex:1;color:var(--ink);}
+  .pin-modal-head button{background:none;border:none;font-size:20px;cursor:pointer;color:#888;line-height:1;}
+  .pin-modal-body{padding:4px 20px 20px;}
+  .pin-modal-body input{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:6px;font-size:15px;font-family:inherit;letter-spacing:2px;box-sizing:border-box;}
+  .pin-modal-body input:focus{outline:none;border-color:var(--orange);}
+  .pin-modal-error{color:var(--red);font-size:12px;margin-top:8px;}
+  .pin-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;}
+  .pin-modal-actions button{font-size:13px;padding:8px 18px;border-radius:6px;cursor:pointer;border:none;font-weight:600;}
+  .pin-modal-actions button.cancel{background:#eef0f2;color:#444;}
+  .pin-modal-actions button.confirm{background:var(--red);color:#fff;}
+  .pin-modal-actions button:hover{filter:brightness(1.05);}
+
+  /* RECALL PICKER MODAL */
+  .recall-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;align-items:center;justify-content:center;padding:20px;}
+  .recall-overlay.open{display:flex;}
+  .recall-modal{background:#fff;border-radius:8px;width:560px;max-width:100%;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,.3);}
+  .recall-modal-head{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;}
+  .recall-modal-head h3{margin:0;font-size:15px;flex:1;color:var(--ink);}
+  .recall-modal-head button{background:none;border:none;font-size:20px;cursor:pointer;color:#888;line-height:1;}
+  .recall-modal-search{padding:12px 20px;border-bottom:1px solid var(--line);}
+  .recall-modal-search input{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:5px;font-size:13px;font-family:inherit;}
+  .recall-modal-list{overflow-y:auto;padding:6px 10px;flex:1;}
+  .recall-item{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:6px;cursor:pointer;border:1px solid transparent;}
+  .recall-item:hover{background:#f4f5f6;border-color:var(--line);}
+  .recall-item .rf-top{display:flex;justify-content:space-between;align-items:center;font-size:13px;}
+  .recall-item .rf-noform{font-weight:700;color:var(--red);}
+  .recall-item .rf-status{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;}
+  .recall-item .rf-status.pending{background:#fff3cd;color:#856404;}
+  .recall-item .rf-status.approved1{background:#cfe2ff;color:#084298;}
+  .recall-item .rf-status.approved2{background:#d1e7dd;color:#0a3622;}
+  .recall-item .rf-status.rejected{background:#f8d7da;color:#842029;}
+  .recall-item .rf-sub{font-size:12px;color:#666;}
+  .recall-empty{text-align:center;padding:30px 10px;color:#888;font-size:13px;}
+
   @media(max-width:700px){
     .header{flex-direction:column;}
     .logo-box{flex:none;}
@@ -206,6 +245,42 @@
     <a href="#" onclick="window.open('https://docs.google.com/spreadsheets','_blank');closeSidebar();return false;"><span class="icon">📊</span>Google Sheet</a>
   </nav>
   <div class="sidebar-footer">PT Integra Solusi Mandiri &copy; 2025</div>
+</div>
+
+<!-- PIN / PASSWORD MODAL -->
+<div class="pin-overlay" id="pinOverlay" onclick="if(event.target===this) closePinModal()">
+  <div class="pin-modal">
+    <div class="pin-modal-head">
+      <h3 id="pinModalTitle">🔑 Masukkan PIN</h3>
+      <button onclick="closePinModal()">✕</button>
+    </div>
+    <div class="pin-modal-body">
+      <p id="pinModalDesc" style="font-size:12.5px;color:#666;margin:0 0 10px;"></p>
+      <input type="password" id="pinModalInput" placeholder="••••••" autocomplete="off"
+             onkeydown="if(event.key==='Enter') submitPinModal()">
+      <div class="pin-modal-error" id="pinModalError" style="display:none;">PIN/Password salah, coba lagi.</div>
+      <div class="pin-modal-actions">
+        <button class="cancel" onclick="closePinModal()">Batal</button>
+        <button class="confirm" onclick="submitPinModal()">Konfirmasi</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- RECALL PICKER MODAL -->
+<div class="recall-overlay" id="recallOverlay" onclick="if(event.target===this) closeRecallModal()">
+  <div class="recall-modal">
+    <div class="recall-modal-head">
+      <h3>🔍 Cari &amp; Edit Data Form</h3>
+      <button onclick="closeRecallModal()">✕</button>
+    </div>
+    <div class="recall-modal-search">
+      <input type="text" id="recallSearchInput" placeholder="Cari No. Form, nama, atau nopol..." oninput="filterRecallList()">
+    </div>
+    <div class="recall-modal-list" id="recallModalList">
+      <div class="recall-empty">Memuat daftar form...</div>
+    </div>
+  </div>
 </div>
 
 <!-- TOOLBAR -->
@@ -546,17 +621,49 @@ async function cekKendaraanTersedia(){
   }catch(e){ return true; }
 }
 
+/* ============================================================
+   PIN / PASSWORD MODAL (generik, dipakai untuk Super User & Edit Recall)
+   ============================================================ */
+let pinModalExpected = null;
+let pinModalOnSuccess = null;
+
+function openPinModal(title, desc, expectedValue, onSuccess){
+  document.getElementById('pinModalTitle').textContent = title;
+  document.getElementById('pinModalDesc').textContent = desc;
+  document.getElementById('pinModalInput').value = '';
+  document.getElementById('pinModalError').style.display = 'none';
+  pinModalExpected = expectedValue;
+  pinModalOnSuccess = onSuccess;
+  document.getElementById('pinOverlay').classList.add('open');
+  setTimeout(()=>document.getElementById('pinModalInput').focus(), 50);
+}
+function closePinModal(){
+  document.getElementById('pinOverlay').classList.remove('open');
+  pinModalOnSuccess = null;
+}
+function submitPinModal(){
+  const val = document.getElementById('pinModalInput').value;
+  if(val === pinModalExpected){
+    const cb = pinModalOnSuccess;
+    closePinModal();
+    if(cb) cb();
+  } else {
+    document.getElementById('pinModalError').style.display = 'block';
+    document.getElementById('pinModalInput').value = '';
+    document.getElementById('pinModalInput').focus();
+  }
+}
+
 /* ---- SUPER USER ---- */
 let superUserMode = false;
 function toggleSuperUser(){
   if(!superUserMode){
-    const pw = prompt("Masukkan password Super User:");
-    if(pw===CONFIG.SUPERUSER_PASSWORD){
+    openPinModal('🔒 Super User', 'Masukkan password Super User untuk mengaktifkan mode ini.', CONFIG.SUPERUSER_PASSWORD, ()=>{
       superUserMode=true;
       document.getElementById('suBadge').style.display='inline-block';
       document.getElementById('editVehBtn').style.display='inline-block';
       document.getElementById('suToggleBtn').textContent="🔓 Keluar Super User";
-    } else if(pw!==null){ alert("Password salah."); }
+    });
   } else {
     superUserMode=false;
     document.getElementById('suBadge').style.display='none';
@@ -700,10 +807,74 @@ const RECALL_FIELD_IDS = [
   'tglForm'
 ];
 
+let recallListCache = [];
+
 function openRecallModal(){
-  const noForm = prompt("Masukkan No. Form yang ingin dicari/diedit (contoh: FPM-12345678):");
-  if(!noForm || !noForm.trim()) return;
-  loadSubmissionForEdit(noForm.trim());
+  document.getElementById('recallOverlay').classList.add('open');
+  document.getElementById('recallSearchInput').value = '';
+  loadRecallList();
+}
+function closeRecallModal(){
+  document.getElementById('recallOverlay').classList.remove('open');
+}
+async function loadRecallList(){
+  const listEl = document.getElementById('recallModalList');
+  listEl.innerHTML = '<div class="recall-empty">Memuat daftar form...</div>';
+  if(!CONFIG.SCRIPT_URL.startsWith("http")){
+    listEl.innerHTML = '<div class="recall-empty">SCRIPT_URL belum dikonfigurasi.</div>';
+    return;
+  }
+  try{
+    const res = await fetch(CONFIG.SCRIPT_URL+"?action=getSubmissionsList");
+    const json = await res.json();
+    recallListCache = (json && json.data) ? json.data : [];
+    renderRecallList(recallListCache);
+  }catch(e){
+    listEl.innerHTML = '<div class="recall-empty">Gagal memuat daftar ❌</div>';
+  }
+}
+function statusLabel(s){
+  if(s==='pending') return 'Menunggu Approval';
+  if(s==='approved1') return 'Approval Tahap 1 ✓';
+  if(s==='approved2') return 'Disetujui';
+  if(s==='rejected') return 'Ditolak';
+  return s || '-';
+}
+function renderRecallList(items){
+  const listEl = document.getElementById('recallModalList');
+  if(!items || items.length===0){
+    listEl.innerHTML = '<div class="recall-empty">Belum ada data form.</div>';
+    return;
+  }
+  listEl.innerHTML = '';
+  items.forEach(item=>{
+    const div = document.createElement('div');
+    div.className = 'recall-item';
+    const statusCls = item.approvalStatus || 'pending';
+    div.innerHTML = `
+      <div class="rf-top">
+        <span class="rf-noform">${item.noForm}</span>
+        <span class="rf-status ${statusCls}">${statusLabel(item.approvalStatus)}</span>
+      </div>
+      <div class="rf-sub">${item.nama || '-'} &middot; ${item.tanggalForm || '-'}${item.nopol ? ' &middot; '+item.nopol : ''}</div>
+    `;
+    div.onclick = ()=>{
+      closeRecallModal();
+      loadSubmissionForEdit(item.noForm);
+    };
+    listEl.appendChild(div);
+  });
+}
+function filterRecallList(){
+  const q = document.getElementById('recallSearchInput').value.trim().toLowerCase();
+  if(!q){ renderRecallList(recallListCache); return; }
+  const filtered = recallListCache.filter(item =>
+    (item.noForm||'').toLowerCase().includes(q) ||
+    (item.nama||'').toLowerCase().includes(q) ||
+    (item.nopol||'').toLowerCase().includes(q) ||
+    (item.perusahaan||'').toLowerCase().includes(q)
+  );
+  renderRecallList(filtered);
 }
 
 async function loadSubmissionForEdit(noForm){
@@ -786,13 +957,12 @@ function lockRecallFields(lock){
 
 function editRecallData(){
   if(!recallMode) return;
-  const pin = prompt("Masukkan PIN untuk mengedit data:");
-  if(pin === null) return;
-  if(pin !== RECALL_PIN){ alert("PIN salah."); return; }
-  recallUnlocked = true;
-  lockRecallFields(false);
-  document.getElementById('statusText').textContent =
-    "Mode edit aktif untuk \""+recallNoForm+"\". Ubah data lalu klik \"Update Data\".";
+  openPinModal('🔑 Edit Data Form', 'Masukkan PIN untuk membuka mode edit pada data "'+recallNoForm+'".', RECALL_PIN, ()=>{
+    recallUnlocked = true;
+    lockRecallFields(false);
+    document.getElementById('statusText').textContent =
+      "Mode edit aktif untuk \""+recallNoForm+"\". Ubah data lalu klik \"Update Data\".";
+  });
 }
 
 async function updateRecallData(){
