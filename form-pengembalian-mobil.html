@@ -519,13 +519,26 @@ function closeSidebar(){
   document.getElementById('sidebarOverlay').classList.remove('open');
 }
 
+/* ---- TANGGAL LOKAL (fix bug: toISOString() selalu UTC, salah 1 hari
+   untuk WIB/WITA/WIT saat form dibuka dini hari) ---- */
+function todayLocal(){
+  const d = new Date();
+  return new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+}
+// Bandingkan 2 tanggal string "YYYY-MM-DD" berbasis UTC-noon supaya
+// hasil selisih hari akurat, terlepas dari timezone browser.
+function daysBetweenYMD(fromStr, toStr){
+  const toUTC = s => { const [y,m,d] = s.split('-').map(Number); return Date.UTC(y, m-1, d); };
+  return Math.round((toUTC(toStr) - toUTC(fromStr)) / 86400000);
+}
+
 /* ---- INIT ---- */
-document.getElementById('tglFormRet').value = new Date().toISOString().slice(0,10);
+document.getElementById('tglFormRet').value = todayLocal();
 document.getElementById('noFormRet').value = "FPN-" + Date.now().toString().slice(-8);
-document.getElementById('r_tglKembali').value = new Date().toISOString().slice(0,10);
+document.getElementById('r_tglKembali').value = todayLocal();
 document.getElementById('r_waktuKembali').value = new Date().toTimeString().slice(0,5);
-document.getElementById('hr_tglDari').value = new Date().toISOString().slice(0,10);
-document.getElementById('hr_tglKe').value = new Date().toISOString().slice(0,10);
+document.getElementById('hr_tglDari').value = todayLocal();
+document.getElementById('hr_tglKe').value = todayLocal();
 
 /* ---- LOAD ACTIVE LOANS ---- */
 let allActiveLoans = [];
@@ -581,9 +594,7 @@ function onLoanSelected(){
   const tglSelesaiStr = row['Tgl Selesai'] || '';
   let terlambatBadge = '';
   if(tglSelesaiStr){
-    const tglSelesai = new Date(tglSelesaiStr);
-    const today = new Date(); today.setHours(0,0,0,0);
-    const diff = Math.floor((today - tglSelesai) / 86400000);
+    const diff = daysBetweenYMD(tglSelesaiStr, todayLocal());
     if(diff > 0) terlambatBadge = `<span class="overdue-badge">Terlambat ${diff} hari</span>`;
     else if(diff === 0) terlambatBadge = `<span class="late-badge">Jatuh tempo hari ini</span>`;
   }
@@ -667,9 +678,7 @@ function cekKeterlambatan(){
     return;
   }
 
-  const tglSelesai = new Date(tglSelesaiStr);
-  const tglKembali = new Date(tglKembaliStr);
-  const diff = Math.floor((tglKembali - tglSelesai) / 86400000);
+  const diff = daysBetweenYMD(tglSelesaiStr, tglKembaliStr);
 
   const statusEl = document.getElementById('r_statusLabel');
   const selisihEl = document.getElementById('r_selisihHari');

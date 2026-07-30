@@ -213,11 +213,15 @@
   <button class="menu-btn" onclick="openSidebar()">☰</button>
   <button onclick="printForm()">🖨️ Print</button>
   <button onclick="downloadPdf()">⬇️ Download PDF</button>
+  <button class="secondary" onclick="openRecallModal()">🔍 Cari &amp; Edit Data</button>
   <div class="spacer"></div>
   <span class="approval-badge pending" id="approvalBadge" style="display:none;"></span>
+  <span class="approval-badge" id="recallBadge" style="display:none;background:#cfe2ff;color:#084298;">📝 Mode Edit: <span id="recallNoFormLabel"></span></span>
+  <button class="secondary" id="editRecallBtn" style="display:none;" onclick="editRecallData()">🔑 Masukkan PIN untuk Edit</button>
+  <button class="secondary" id="exitRecallBtn" style="display:none;" onclick="exitRecallMode()">↩️ Form Baru</button>
   <span class="status" id="statusText">Belum tersimpan</span>
   <button class="secondary" id="suToggleBtn" onclick="toggleSuperUser()">🔒 Super User</button>
-  <button class="danger" onclick="submitForm()">✅ Simpan & Kirim Approval</button>
+  <button class="danger" id="mainSubmitBtn" onclick="submitForm()">✅ Simpan &amp; Kirim Approval</button>
 </div>
 
 <div class="page-wrap">
@@ -420,11 +424,18 @@ const CONFIG = {
 function openSidebar(){document.getElementById('sidebar').classList.add('open');document.getElementById('sidebarOverlay').classList.add('open');}
 function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sidebarOverlay').classList.remove('open');}
 
+/* ---- TANGGAL LOKAL (fix bug: toISOString() selalu UTC, salah 1 hari
+   untuk WIB/WITA/WIT saat form dibuka dini hari) ---- */
+function todayLocal(){
+  const d = new Date();
+  return new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+}
+
 /* ---- INIT ---- */
-document.getElementById('tglForm').value = new Date().toISOString().slice(0,10);
+document.getElementById('tglForm').value = todayLocal();
 document.getElementById('noForm').value = "FPM-" + Date.now().toString().slice(-8);
-document.getElementById('h_tglDari').value = new Date().toISOString().slice(0,10);
-document.getElementById('h_tglKe').value = new Date().toISOString().slice(0,10);
+document.getElementById('h_tglDari').value = todayLocal();
+document.getElementById('h_tglKe').value = todayLocal();
 
 function hitungDurasi(){
   const a = document.getElementById('i_tglMulai').value;
@@ -650,6 +661,7 @@ function collectFormData(){
 
 /* ---- SUBMIT ---- */
 async function submitForm(){
+  if(recallMode){ await updateRecallData(); return; }
   if(!document.getElementById('p_nama').value){ alert("Nama Lengkap wajib diisi."); return; }
   if(!document.getElementById('p_email').value){ alert("Email wajib diisi agar notifikasi approval bisa dikirim ke peminjam."); return; }
   if(!CONFIG.SCRIPT_URL.startsWith("http")){ alert("SCRIPT_URL belum dikonfigurasi."); return; }
@@ -667,6 +679,151 @@ async function submitForm(){
   }catch(e){
     document.getElementById('statusText').textContent = "Gagal menyimpan ❌";
   }
+}
+
+/* ============================================================
+   RECALL & EDIT DATA (dengan proteksi PIN)
+   ============================================================ */
+const RECALL_PIN = "ism2026";
+let recallMode = false;     // sedang menampilkan/mengedit data lama?
+let recallUnlocked = false; // PIN sudah benar & field boleh diedit?
+let recallNoForm = null;
+
+// Field yang ikut dikunci/dibuka saat mode recall (di luar noForm, yang selalu readonly)
+const RECALL_FIELD_IDS = [
+  'p_nama','p_perusahaan','p_jabatan','p_alamat','p_ktp','p_telp','p_email',
+  'i_tujuan','i_tglMulai','i_waktuMulai','i_tglSelesai','i_waktuSelesai','i_durasi',
+  'i_lokasiJemput','i_lokasiKembali',
+  'km_awal','fuelLevel','kondisiCatatan',
+  'h_namaDari','h_jabatanDari','h_tglDari','h_namaKe','h_jabatanKe','h_tglKe',
+  'k_stnk','k_kunci','k_dongkrak','k_ban','k_segitiga','k_p3k','k_lainnyaChk','k_lainnyaTxt',
+  'tglForm'
+];
+
+function openRecallModal(){
+  const noForm = prompt("Masukkan No. Form yang ingin dicari/diedit (contoh: FPM-12345678):");
+  if(!noForm || !noForm.trim()) return;
+  loadSubmissionForEdit(noForm.trim());
+}
+
+async function loadSubmissionForEdit(noForm){
+  if(!CONFIG.SCRIPT_URL.startsWith("http")){ alert("SCRIPT_URL belum dikonfigurasi."); return; }
+  document.getElementById('statusText').textContent = "Mencari data \""+noForm+"\"...";
+  try{
+    const res = await fetch(CONFIG.SCRIPT_URL+"?action=getSubmissionByNoForm&noForm="+encodeURIComponent(noForm));
+    const json = await res.json();
+    if(json.error){
+      alert(json.error);
+      document.getElementById('statusText').textContent = "Data tidak ditemukan.";
+      return;
+    }
+    populateFormFromData(json.data);
+    recallMode = true;
+    recallUnlocked = false;
+    recallNoForm = json.data.noForm;
+    lockRecallFields(true);
+    document.getElementById('recallBadge').style.display = 'inline-block';
+    document.getElementById('recallNoFormLabel').textContent = recallNoForm;
+    document.getElementById('editRecallBtn').style.display = 'inline-block';
+    document.getElementById('exitRecallBtn').style.display = 'inline-block';
+    document.getElementById('mainSubmitBtn').textContent = '💾 Update Data';
+    document.getElementById('statusText').textContent =
+      "Data \""+recallNoForm+"\" dimuat (mode lihat). Klik \"Masukkan PIN untuk Edit\" untuk mengubah.";
+  }catch(e){
+    document.getElementById('statusText').textContent = "Gagal memuat data ❌";
+  }
+}
+
+function populateFormFromData(d){
+  document.getElementById('noForm').value = d.noForm || '';
+  document.getElementById('tglForm').value = d.tanggalForm || '';
+  document.getElementById('p_nama').value = d.nama || '';
+  document.getElementById('p_perusahaan').value = d.perusahaan || '';
+  document.getElementById('p_jabatan').value = d.jabatan || '';
+  document.getElementById('p_alamat').value = d.alamat || '';
+  document.getElementById('p_ktp').value = d.ktp || '';
+  document.getElementById('p_telp').value = d.telepon || '';
+  document.getElementById('p_email').value = d.email || '';
+  document.getElementById('i_tujuan').value = d.tujuan || '';
+  document.getElementById('i_tglMulai').value = d.tglMulai || '';
+  document.getElementById('i_waktuMulai').value = d.waktuMulai || '';
+  document.getElementById('i_tglSelesai').value = d.tglSelesai || '';
+  document.getElementById('i_waktuSelesai').value = d.waktuSelesai || '';
+  document.getElementById('i_durasi').value = d.durasi || '';
+  document.getElementById('i_lokasiJemput').value = d.lokasiJemput || '';
+  document.getElementById('i_lokasiKembali').value = d.lokasiKembali || '';
+  document.querySelectorAll('input[name=driver]').forEach(r=>{ r.checked = (r.value === d.denganDriver); });
+  document.getElementById('km_awal').value = d.kmAwal || '';
+  document.getElementById('fuelLevel').value = d.levelBensin || 50;
+  updateFuel();
+  document.getElementById('kondisiCatatan').value = d.catatanKondisi || '';
+  document.getElementById('h_namaDari').value = d.namaDari || '';
+  document.getElementById('h_jabatanDari').value = d.jabatanDari || '';
+  document.getElementById('h_tglDari').value = d.tglDari || '';
+  document.getElementById('h_namaKe').value = d.namaKe || '';
+  document.getElementById('h_jabatanKe').value = d.jabatanKe || '';
+  document.getElementById('h_tglKe').value = d.tglKe || '';
+  document.getElementById('k_stnk').checked = !!d.stnk;
+  document.getElementById('k_kunci').checked = !!d.kunciCadangan;
+  document.getElementById('k_dongkrak').checked = !!d.dongkrak;
+  document.getElementById('k_ban').checked = !!d.banSerep;
+  document.getElementById('k_segitiga').checked = !!d.segitiga;
+  document.getElementById('k_p3k').checked = !!d.p3k;
+  document.getElementById('k_lainnyaChk').checked = !!d.lainnya;
+  document.getElementById('k_lainnyaTxt').value = d.lainnya || '';
+  // Catatan: data kendaraan (jenis/merk/nopol/dll) & foto SIM sengaja
+  // tidak diubah dari sini — itu data master kendaraan / arsip yang
+  // dikelola lewat mode Super User dan tidak diedit lewat recall ini.
+}
+
+function lockRecallFields(lock){
+  RECALL_FIELD_IDS.forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.disabled = lock;
+  });
+  document.querySelectorAll('input[name=driver]').forEach(r=> r.disabled = lock );
+}
+
+function editRecallData(){
+  if(!recallMode) return;
+  const pin = prompt("Masukkan PIN untuk mengedit data:");
+  if(pin === null) return;
+  if(pin !== RECALL_PIN){ alert("PIN salah."); return; }
+  recallUnlocked = true;
+  lockRecallFields(false);
+  document.getElementById('statusText').textContent =
+    "Mode edit aktif untuk \""+recallNoForm+"\". Ubah data lalu klik \"Update Data\".";
+}
+
+async function updateRecallData(){
+  if(!recallUnlocked){
+    alert("Klik dulu \"Masukkan PIN untuk Edit\" sebelum menyimpan perubahan.");
+    return;
+  }
+  if(!document.getElementById('p_nama').value){ alert("Nama Lengkap wajib diisi."); return; }
+  if(!CONFIG.SCRIPT_URL.startsWith("http")){ alert("SCRIPT_URL belum dikonfigurasi."); return; }
+  document.getElementById('statusText').textContent = "Menyimpan perubahan...";
+  const payload = collectFormData();
+  payload.action = 'updateSubmission';
+  payload.noForm = recallNoForm;
+  payload.pin = RECALL_PIN;
+  try{
+    const res = await fetch(CONFIG.SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
+    const json = await res.json();
+    if(json && json.error){
+      document.getElementById('statusText').textContent = "Gagal: "+json.error;
+      return;
+    }
+    document.getElementById('statusText').textContent =
+      "Perubahan pada \""+recallNoForm+"\" tersimpan ✅ ("+new Date().toLocaleTimeString('id-ID')+")";
+  }catch(e){
+    document.getElementById('statusText').textContent = "Gagal menyimpan perubahan ❌";
+  }
+}
+
+function exitRecallMode(){
+  if(recallMode && !confirm("Keluar dari mode edit dan mulai form baru? Perubahan yang belum disimpan akan hilang.")) return;
+  location.reload();
 }
 
 /* ---- PRINT & PDF ---- */
