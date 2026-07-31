@@ -104,6 +104,7 @@
     background:#fff;color:var(--orange);cursor:pointer;font-weight:600;
   }
   .sim-upload-box .sim-btns button:hover{background:var(--orange);color:#fff;}
+  .sim-upload-box .sim-btns button:disabled{opacity:.45;cursor:not-allowed;background:#fff;color:var(--orange);}
   .sim-preview{display:none;position:relative;margin-top:6px;}
   .sim-preview img{width:100%;max-height:160px;object-fit:cover;border-radius:5px;border:1px solid var(--line);}
   .sim-preview .sim-remove{
@@ -363,8 +364,8 @@
       <div class="sim-upload-box">
         <div class="sim-title">📷 Foto SIM</div>
         <div class="sim-btns no-print">
-          <button onclick="document.getElementById('simCamera').click()">📷 Kamera</button>
-          <button onclick="document.getElementById('simFile').click()">📁 Upload File</button>
+          <button id="simCamBtn" onclick="document.getElementById('simCamera').click()">📷 Kamera</button>
+          <button id="simFileBtn" onclick="document.getElementById('simFile').click()">📁 Upload File</button>
         </div>
         <input type="file" id="simCamera" accept="image/*" capture="environment" onchange="handleSimUpload(this)">
         <input type="file" id="simFile" accept="image/*" onchange="handleSimUpload(this)">
@@ -605,11 +606,39 @@ let simBase64 = null;
 function handleSimUpload(input){
   const file = input.files[0];
   if(!file) return;
-  // Resize gambar sebelum disimpan (max 800px lebar, JPEG 0.7)
+
+  // BUG FIX: dulu tidak ada validasi tipe file — kalau user (lewat "Upload
+  // File") pilih file yang bukan gambar (mis. PDF/HEIC yang tidak didukung
+  // <canvas>), proses gagal total diam-diam tanpa pesan apa pun ke user.
+  if(!file.type.startsWith('image/')){
+    alert("File \""+file.name+"\" bukan format gambar yang didukung (JPG/PNG/WEBP). Kalau ini foto dari iPhone, pastikan formatnya JPEG (Settings → Camera → Formats → Most Compatible), bukan HEIC.");
+    input.value = '';
+    return;
+  }
+
+  document.getElementById('simHint').textContent = "⏳ Memproses foto...";
+
   const reader = new FileReader();
+  // BUG FIX: dulu tidak ada penanganan error FileReader — kalau file rusak/
+  // gagal dibaca, tidak ada feedback ke user sama sekali (terlihat seperti
+  // tombol tidak berfungsi).
+  reader.onerror = () => {
+    alert("Gagal membaca file \""+file.name+"\". Coba pilih file lain.");
+    document.getElementById('simHint').textContent = 'Belum ada foto SIM. Ambil foto atau upload file.';
+    input.value = '';
+  };
   reader.onload = e => {
     const img = new Image();
+    // BUG FIX: dulu tidak ada penanganan error saat gambar gagal di-decode
+    // (mis. format HEIC yang tidak didukung <canvas> di browser desktop) —
+    // hasilnya upload terlihat "diam saja", padahal sebenarnya gagal total.
+    img.onerror = () => {
+      alert("Foto \""+file.name+"\" tidak bisa diproses (kemungkinan format tidak didukung browser). Coba screenshot foto tersebut lalu upload ulang, atau gunakan format JPG/PNG.");
+      document.getElementById('simHint').textContent = 'Belum ada foto SIM. Ambil foto atau upload file.';
+      input.value = '';
+    };
     img.onload = () => {
+      // Resize gambar sebelum disimpan (max 800px lebar, JPEG 0.7)
       const maxW = 800;
       let w = img.width, h = img.height;
       if(w > maxW){ h = Math.round(h*maxW/w); w = maxW; }
@@ -874,8 +903,17 @@ async function submitForm(){
   document.getElementById('statusText').textContent = "Menyimpan & mengirim approval...";
   const payload = collectFormData();
   try{
-    await fetch(CONFIG.SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
-    document.getElementById('statusText').textContent = "Tersimpan ✅ Email approval terkirim ke approver.";
+    const res = await fetch(CONFIG.SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
+    const json = await res.json();
+    if(json && json.fotoSimFailed){
+      // BUG FIX: sebelumnya kegagalan upload Foto SIM ke Google Drive tidak
+      // pernah diberitahukan — form tersimpan "sukses" padahal foto SIM
+      // hilang. Sekarang admin diberi peringatan eksplisit.
+      document.getElementById('statusText').textContent =
+        "Tersimpan ✅, TAPI Foto SIM gagal diupload ke Drive ⚠️ — coba \"Cari & Edit Data\" lalu upload ulang.";
+    } else {
+      document.getElementById('statusText').textContent = "Tersimpan ✅ Email approval terkirim ke approver.";
+    }
     document.getElementById('approvalBadge').style.display='inline-block';
     document.getElementById('approvalBadge').textContent='⏳ Menunggu Approval';
     document.getElementById('metaStatus').textContent='Menunggu Approval';
@@ -900,7 +938,9 @@ const RECALL_FIELD_IDS = [
   'km_awal','fuelLevel','kondisiCatatan',
   'h_namaDari','h_jabatanDari','h_tglDari','h_namaKe','h_jabatanKe','h_tglKe',
   'k_stnk','k_kunci','k_dongkrak','k_ban','k_segitiga','k_p3k','k_lainnyaChk','k_lainnyaTxt',
-  'tglForm'
+  'tglForm',
+  'simCamBtn','simFileBtn' // BUG FIX: dulu tombol Foto SIM tidak ikut terkunci
+                            // saat mode lihat (sebelum PIN dimasukkan)
 ];
 
 let recallListCache = [];
@@ -1037,9 +1077,20 @@ function populateFormFromData(d){
   document.getElementById('k_p3k').checked = !!d.p3k;
   document.getElementById('k_lainnyaChk').checked = !!d.lainnya;
   document.getElementById('k_lainnyaTxt').value = d.lainnya || '';
-  // Catatan: data kendaraan (jenis/merk/nopol/dll) & foto SIM sengaja
-  // tidak diubah dari sini — itu data master kendaraan / arsip yang
-  // dikelola lewat mode Super User dan tidak diedit lewat recall ini.
+
+  // BUG FIX: sebelumnya kalau user upload Foto SIM lalu pindah ke form lain
+  // lewat "Cari & Edit Data" tanpa submit dulu, preview foto lama itu masih
+  // nyangkut dan seolah-olah jadi Foto SIM milik form yang baru dimuat.
+  // Reset dulu setiap kali data baru dimuat.
+  removeSim();
+  if(d.fotoSimUrl){
+    document.getElementById('simHint').innerHTML =
+      'Foto SIM tersimpan: <a href="'+d.fotoSimUrl+'" target="_blank" rel="noopener">lihat foto</a> '
+      + '(upload foto baru di sini untuk menggantinya)';
+  }
+  // Catatan: data kendaraan (jenis/merk/nopol/dll) sengaja tidak diubah dari
+  // sini — itu data master kendaraan yang dikelola lewat mode Super User dan
+  // tidak diedit lewat recall ini.
 }
 
 function lockRecallFields(lock){
@@ -1078,8 +1129,13 @@ async function updateRecallData(){
       document.getElementById('statusText').textContent = "Gagal: "+json.error;
       return;
     }
-    document.getElementById('statusText').textContent =
-      "Perubahan pada \""+recallNoForm+"\" tersimpan ✅ ("+new Date().toLocaleTimeString('id-ID')+")";
+    if(json && json.fotoSimFailed){
+      document.getElementById('statusText').textContent =
+        "Perubahan tersimpan ✅, TAPI Foto SIM baru gagal diupload ⚠️ — foto lama tetap dipakai, coba upload ulang.";
+    } else {
+      document.getElementById('statusText').textContent =
+        "Perubahan pada \""+recallNoForm+"\" tersimpan ✅ ("+new Date().toLocaleTimeString('id-ID')+")";
+    }
   }catch(e){
     document.getElementById('statusText').textContent = "Gagal menyimpan perubahan ❌";
   }
