@@ -59,15 +59,17 @@
   .logo-diamond svg{width:100%;height:100%;}
   .logo-text b{display:block;font-size:22px;letter-spacing:1px;color:#20232a;line-height:1.1;}
   .logo-text span{display:block;font-size:10px;letter-spacing:3px;color:#54585f;margin-top:3px;}
-  .banner{flex:1;position:relative;background:var(--red);clip-path:polygon(60px 0,100% 0,100% 100%,0 100%);display:flex;align-items:center;justify-content:center;flex-direction:column;color:#fff;padding:10px 24px;}
+  .banner{flex:1;position:relative;background:var(--red);clip-path:polygon(60px 0,100% 0,100% 100%,0 100%);display:flex;align-items:center;justify-content:center;flex-direction:column;color:#fff;padding:10px 24px;gap:6px;}
   .banner::before{content:"";position:absolute;left:0;top:0;bottom:0;width:60px;background:var(--orange);clip-path:polygon(60px 0,100% 0,40px 100%,0 100%);}
   .banner h1{margin:0;font-size:22px;letter-spacing:1px;}
-  .banner .car-ico{margin-top:2px;font-size:16px;}
-  .meta-box{margin:8px 20px 0 auto;width:280px;border:1px solid var(--ink);border-radius:4px;padding:6px 12px;font-size:12.5px;}
-  .meta-row{display:flex;gap:8px;margin:2px 0;align-items:baseline;}
-  .meta-row label{width:70px;flex:none;}
-  .meta-row .val{flex:1;border-bottom:1px solid var(--ink);min-height:16px;}
-  .meta-row input{border:none;border-bottom:1px solid var(--ink);width:100%;font-size:12.5px;background:transparent;padding:0 0 1px;}
+  .banner-meta{display:flex;gap:20px;flex-wrap:wrap;justify-content:center;}
+  .banner-meta-item{display:flex;align-items:center;gap:5px;font-size:11.5px;}
+  .banner-meta-item label{opacity:.9;font-weight:600;white-space:nowrap;}
+  .banner-meta-item input{background:rgba(255,255,255,.15);border:none;border-bottom:1px solid rgba(255,255,255,.65);
+    color:#fff;font-size:11.5px;padding:1px 4px;width:112px;border-radius:2px 2px 0 0;}
+  .banner-meta-item input::placeholder{color:rgba(255,255,255,.7);}
+  .banner-meta-item input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);cursor:pointer;}
+  .banner-meta-item #metaStatus{font-weight:700;color:#ffe08a;}
   .instruction{margin:6px 24px 4px;font-size:12.5px;color:#333;border-bottom:2px solid var(--ink);padding-bottom:6px;}
 
   /* FIELDS */
@@ -213,7 +215,8 @@
     .logo-box{flex:none;}
     .banner{clip-path:none;padding:16px;}
     .banner::before{display:none;}
-    .meta-box{margin:12px 20px;width:auto;}
+    .banner-meta{flex-direction:column;gap:4px;align-items:flex-start;width:100%;}
+    .banner-meta-item input{width:150px;}
     .two-col{flex-direction:column;gap:0;}
     .veh-flex{flex-direction:column;}
     .veh-left{flex:none;}
@@ -327,15 +330,15 @@
     </div>
     <div class="banner">
       <h1>FORM PEMAKAIAN MOBIL</h1>
+      <div class="banner-meta">
+        <div class="banner-meta-item"><label>No. Form</label><input type="text" id="noForm" readonly></div>
+        <div class="banner-meta-item"><label>Tanggal</label><input type="date" id="tglForm"></div>
+        <div class="banner-meta-item"><label>Status</label><span id="metaStatus">Menunggu Approval</span></div>
+      </div>
     </div>
   </div>
   <div id="fallbackLogo" style="display:none;">
     <svg viewBox="0 0 100 100"><polygon points="50,4 96,50 50,96 4,50" fill="#f07d1a"/><polygon points="50,20 80,50 50,80 20,50" fill="#8a1116"/><polygon points="50,36 64,50 50,64 36,50" fill="#f5a623"/></svg>
-  </div>
-  <div class="meta-box">
-    <div class="meta-row"><label>No. Form</label><span>:</span><input type="text" id="noForm" readonly></div>
-    <div class="meta-row"><label>Tanggal</label><span>:</span><input type="date" id="tglForm"></div>
-    <div class="meta-row"><label>Status</label><span>:</span><span id="metaStatus" style="font-weight:600;color:#856404;">Menunggu Approval</span></div>
   </div>
   <div class="instruction">Mohon lengkapi data berikut dengan benar. Form akan dikirim ke approver setelah disimpan.</div>
 </div>
