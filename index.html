@@ -905,12 +905,26 @@ async function submitForm(){
   try{
     const res = await fetch(CONFIG.SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
     const json = await res.json();
+    console.log('[submitForm] response dari server:', json); // BUG FIX: log respons mentah supaya gampang didiagnosa lewat DevTools Console kalau ada yang tidak sesuai
     if(json && json.fotoSimFailed){
       // BUG FIX: sebelumnya kegagalan upload Foto SIM ke Google Drive tidak
       // pernah diberitahukan — form tersimpan "sukses" padahal foto SIM
       // hilang. Sekarang admin diberi peringatan eksplisit.
       document.getElementById('statusText').textContent =
         "Tersimpan ✅, TAPI Foto SIM gagal diupload ke Drive ⚠️ — coba \"Cari & Edit Data\" lalu upload ulang.";
+    } else if(payload.fotoSim && !(json && json.fotoSimUrl)){
+      // BUG FIX UTAMA: sebelumnya kalau ada Foto SIM yang dikirim (payload.fotoSim
+      // terisi) tapi respons server TIDAK punya fotoSimUrl (bukti nyata foto sudah
+      // diupload ke Drive) DAN juga tidak menyetel fotoSimFailed, halaman ini tetap
+      // menampilkan "Tersimpan ✅" seolah semuanya beres — padahal ini gejala paling
+      // umum saat backend (Code.gs) sama sekali belum memproses field fotoSim, atau
+      // gagal tapi tidak melempar error yang tertangkap. Preview di browser memang
+      // selalu berhasil (itu cuma FileReader + canvas lokal), tapi itu BUKAN bukti
+      // foto sudah tersimpan di server. Sekarang user diberi peringatan eksplisit
+      // alih-alih pesan sukses yang menyesatkan.
+      console.warn('[submitForm] Foto SIM dikirim tapi server tidak mengembalikan fotoSimUrl — kemungkinan backend belum/gagal memproses upload.', json);
+      document.getElementById('statusText').textContent =
+        "Tersimpan ✅, TAPI status Foto SIM TIDAK dikonfirmasi oleh server ⚠️ — kemungkinan backend (Code.gs) belum memproses upload foto ke Drive. Cek folder Drive untuk memastikan, atau lihat log Apps Script (Extensions → Apps Script → Executions).";
     } else {
       document.getElementById('statusText').textContent = "Tersimpan ✅ Email approval terkirim ke approver.";
     }
@@ -1125,6 +1139,7 @@ async function updateRecallData(){
   try{
     const res = await fetch(CONFIG.SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
     const json = await res.json();
+    console.log('[updateRecallData] response dari server:', json); // BUG FIX: log respons mentah untuk diagnosa
     if(json && json.error){
       document.getElementById('statusText').textContent = "Gagal: "+json.error;
       return;
@@ -1132,6 +1147,12 @@ async function updateRecallData(){
     if(json && json.fotoSimFailed){
       document.getElementById('statusText').textContent =
         "Perubahan tersimpan ✅, TAPI Foto SIM baru gagal diupload ⚠️ — foto lama tetap dipakai, coba upload ulang.";
+    } else if(payload.fotoSim && !(json && json.fotoSimUrl)){
+      // BUG FIX: sama seperti di submitForm() — kalau ada foto baru dikirim tapi
+      // server tidak mengonfirmasi lewat fotoSimUrl, jangan klaim sukses begitu saja.
+      console.warn('[updateRecallData] Foto SIM baru dikirim tapi server tidak mengembalikan fotoSimUrl.', json);
+      document.getElementById('statusText').textContent =
+        "Perubahan tersimpan ✅, TAPI status Foto SIM baru TIDAK dikonfirmasi oleh server ⚠️ — cek folder Drive / log Apps Script untuk memastikan foto benar-benar tersimpan.";
     } else {
       document.getElementById('statusText').textContent =
         "Perubahan pada \""+recallNoForm+"\" tersimpan ✅ ("+new Date().toLocaleTimeString('id-ID')+")";
